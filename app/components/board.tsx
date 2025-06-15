@@ -77,28 +77,35 @@ export default function Board() {
       console.log({currentActiveField})
       
       if(target.classList.contains("possible-move") && currentActiveField){
-        console.log("DAAFAAAQQQ")
-        target = target.parentElement!;
-        const {row:rowString, col:colString} = target.dataset
-        const row = player === "B" ? Number(rowString) : 7 -  Number(rowString) ;
-        const col = Number(colString);
-        setRows((rows) => {
-          rows[row][col] = rows[currentActiveField[0]][currentActiveField[1]]
-           rows[currentActiveField[0]][currentActiveField[1]] = null;
-           return rows;
-        })
-        return;
-      }
+  console.log("DAAFAAAQQQ")
+  target = target.parentElement!;
+  const {row:rowString, col:colString} = target.dataset
+  const row = player === "B" ? Number(rowString) : 7 -  Number(rowString) ;
+  const col = Number(colString);
+
+  setRows((prevRows) => {
+    const newRows = prevRows.map((r) => [...r]); // create shallow copy of rows
+    newRows[row][col] = newRows[currentActiveField[0]][currentActiveField[1]];
+    newRows[currentActiveField[0]][currentActiveField[1]] = null;
+    return newRows;
+  });
+
+  setCurrentActiveField(undefined);
+  setPossibleMoves([]);
+  setPlayer((prev) => (prev === "W" ? "B" : "W")); // switch player
+  return;
+}
+
 
       const {row:rowString, col:colString} = target.dataset
       console.log(target.dataset)
       const row = player === "B" ? Number(rowString) : 7 -  Number(rowString) ;
       const col = Number(colString);
-      if(rows[row][col]){
-        setCurrentActiveField([row,col]);
-        setPossibleMoves(getPsossiblemoves([row, col], rows as Exclude<Field, null>[][], player))
-        console.log(row, col)
-      }
+     if (rows[row][col] && rows[row][col]?.player === player) {
+  setCurrentActiveField([row, col]);
+  setPossibleMoves(getPossiblemoves([row, col], rows as Exclude<Field, null>[][], player));
+  
+}
     }
  
   useLayoutEffect(() => {
@@ -147,15 +154,28 @@ export default function Board() {
   );
 }
 
-function getPsossiblemoves(coordinates:[number, number],board:Exclude<Field, null>[][], player:Player):[number, number][]{
+function getPossiblemoves(coordinates:[number, number],board:Exclude<Field, null>[][], player:Player):[number, number][]{
   const field = board[coordinates[0]][coordinates[1]];
   const piece = field.piece;
   switch(piece){
     case"P":
       return getPossiblePawmMoves(coordinates, board, player)
+    case "Kn":
+      return getPossibleKnightMoves(coordinates, board, player)
+    case "R":
+      return getPossibleRookMoves(coordinates, board, player);
+    case "B":
+      return getPossibleBishopMoves(coordinates, board, player);
+    case "Q":
+      return [
+        ...getPossibleRookMoves(coordinates, board, player),
+        ...getPossibleBishopMoves(coordinates, board, player),
+      ];
+    case "K":
+      return getPossibleKingMoves(coordinates, board, player);
+    default:
+      return [];
   }
-
-  return []
 }
 
 
@@ -181,4 +201,105 @@ function getPossiblePawmMoves(coordinates:[number, number],board:Exclude<Field, 
 
   console.log({possibleMoves})
   return possibleMoves
+}
+function getPossibleKnightMoves(
+  [x, y]: [number, number],
+  board: Exclude<Field, null>[][],
+  player: Player
+): [number, number][] {
+  const deltas = [
+    [2, 1],
+    [2, -1],
+    [-2, 1],
+    [-2, -1],
+    [1, 2],
+    [1, -2],
+    [-1, 2],
+    [-1, -2],
+  ];
+
+  const possibleMoves: [number, number][] = [];
+
+  for (const [dx, dy] of deltas) {
+    const nx = x + dx;
+    const ny = y + dy;
+
+    if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+      const target = board[nx][ny];
+      if (!target || target.player !== player) {
+        possibleMoves.push([nx, ny]);
+      }
+    }
+  }
+
+  return possibleMoves;
+}
+function getPossibleRookMoves(
+  [x, y]: [number, number],
+  board: Exclude<Field, null>[][],
+  player: Player
+): [number, number][] {
+ const directions: [number, number][] = [
+  [1, 0], [-1, 0],
+  [0, 1], [0, -1]
+];
+  return getSlidingMoves([x, y], directions, board, player);
+}
+
+function getPossibleBishopMoves(
+  [x, y]: [number, number],
+  board: Exclude<Field, null>[][],
+  player: Player
+): [number, number][] {
+const directions: [number, number][] = [
+  [1, 1], [1, -1],
+  [-1, 1], [-1, -1]
+];
+  return getSlidingMoves([x, y], directions, board, player);
+}
+
+function getPossibleKingMoves(
+  [x, y]: [number, number],
+  board: Exclude<Field, null>[][],
+  player: Player
+): [number, number][] {
+  const deltas = [
+    [1, 0], [-1, 0], [0, 1], [0, -1],
+    [1, 1], [1, -1], [-1, 1], [-1, -1],
+  ];
+  return deltas
+    .map(([dx, dy]) => [x + dx, y + dy] as [number, number])
+    .filter(([nx, ny]) => 
+      nx >= 0 && ny >= 0 && nx < 8 && ny < 8 &&
+      (!board[nx][ny] || board[nx][ny].player !== player)
+    );
+}
+function getSlidingMoves(
+  [x, y]: [number, number],
+  directions: [number, number][],
+  board: Exclude<Field, null>[][],
+  player: Player
+): [number, number][] {
+  const moves: [number, number][] = [];
+
+  for (const [dx, dy] of directions) {
+    let nx = x + dx;
+    let ny = y + dy;
+
+    while (nx >= 0 && ny >= 0 && nx < 8 && ny < 8) {
+      const target = board[nx][ny];
+      if (!target) {
+        moves.push([nx, ny]);
+      } else {
+        if (target.player !== player) {
+          moves.push([nx, ny]);
+        }
+        break;
+      }
+      nx += dx;
+      ny += dy;
+    }
+  }
+
+  return moves;
 }
